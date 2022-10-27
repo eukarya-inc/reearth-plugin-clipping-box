@@ -1,0 +1,60 @@
+id: reearth-clipping-box-plugin
+name: Clipping box plugin
+version: 1.0.0
+extensions:
+  - id: clipping-box
+    type: widget
+    name:  Clipping Box
+    schema:
+      groups:
+        - id: position
+          title: Position
+          fields:
+            - id: lng
+              type: number
+              title: box lng
+            - id: lat
+              type: number
+              title: box lat
+            - id: height
+              type: number
+              title: box height
+        - id: dimensions
+          title: Dimensions
+          fields:
+            - id: width
+              type: number
+              title: box width(x-axis)
+            - id: length
+              type: number
+              title: box length(y-axis)
+            - id: height
+              type: number
+              title: box height(z-axis)
+        - id: tileset
+          title: 3DTileset
+          fields:
+            - id: url
+              type: string
+              title: URL
+        - id: box
+          title: Box
+          fields:
+            - id: outlineColor
+              type: string
+              title: outline color
+            - id: outlineWidth
+              type: string
+              title: outline width
+            - id: fillColor
+              type: string
+              title: side plane color
+        - id: clipping
+          title: Clipping
+          fields:
+            - id: edgeColor
+              type: string
+              title: edge color
+            - id: edgeWidth
+              type: string
+              title: edge width
