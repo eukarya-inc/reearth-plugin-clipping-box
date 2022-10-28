@@ -101,6 +101,7 @@ let isBoxClicked = false;
 let isTopBottomSidePlaneClicked = false;
 let currentCameraPosition = null;
 let currentPosition = position || {};
+let prevY = null;
 reearth.on("mousedown", (e) => {
      if(e.layerId?.startsWith(boxId)) {
         isBoxClicked = true;
@@ -116,19 +117,11 @@ reearth.on("mouseup", () => {
         currentCameraPosition = null;
         isBoxClicked = false;
         isTopBottomSidePlaneClicked = false;
+        prevY = null;
     }
 });
-let prevY = null;
-let prevPosition = null;
 reearth.on("mousemove", (e) => {
     if(!isBoxClicked) return;
-
-    if(!prevPosition) {
-        prevPosition = {
-            lat: e.lat,
-            lng: e.lng,
-        };
-    }
     if(!prevY) {
         prevY = e.y;
     }
@@ -138,12 +131,8 @@ reearth.on("mousemove", (e) => {
         currentPosition.height = Math.max(currentPosition.height + (prevY - e.y) * scale, 1);
         prevY = e.y;
     } else {
-        currentPosition.lat += e.lat - prevPosition.lat;
-        currentPosition.lng += e.lng - prevPosition.lng;
-        prevPosition = {
-            lat: e.lat,
-            lng: e.lng,
-        };
+        currentPosition.lat = e.lat;
+        currentPosition.lng = e.lng;
     }
 
     lookAt(currentCameraPosition);
