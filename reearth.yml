@@ -7,8 +7,8 @@ extensions:
     name:  Clipping Box
     schema:
       groups:
-        - id: position
-          title: Position
+        - id: location
+          title: Location
           fields:
             - id: lng
               type: number

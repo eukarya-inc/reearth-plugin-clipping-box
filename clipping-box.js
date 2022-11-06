@@ -50,8 +50,8 @@ const SIDE_PLANES = [
 ];
 
 const userInput = reearth.widget?.property || {};
-const position = userInput.position;
-const dimensions = userInput.dimensions;
+const location = userInput.location || {};
+const dimensions = userInput.dimensions || {};
 const clipping = userInput.clipping || {};
 const box = userInput.box || {};
 const tileset = userInput.tileset?.url;
@@ -62,9 +62,12 @@ const boxId = reearth.layers.add({
   isVisible: true,
   property: {
     default: {
-      dimensions,
-      position,
-      height: position?.height,
+      location: {
+          lng: location.lng,
+          lat: location.lat,
+          height: location.height,
+      },
+      ...dimensions,
       outlineColor: box.outlineColor,
       outlineWidth: box.outlineWidth,
       fill: !!box.fillColor,
@@ -79,12 +82,14 @@ const tilesetId = reearth.layers.add({
   isVisible: true,
   property: {
     default: {
-      clippingPlaneCollection: {
-        dimensions,
+      experimental_clipping: {
+        location: {
+            lng: location.lng,
+            lat: location.lat,
+            height: location.height,
+        },
+        ...dimensions,
         planes: SIDE_PLANES,
-        lat: position?.lat,
-        lng: position?.lng,
-        height: position?.height,
       },
       edgeColor: clipping.edgeColor,
       edgeWidth: clipping.edgeWidth,
@@ -94,13 +99,13 @@ const tilesetId = reearth.layers.add({
 });
 
 const lookAt = (position) => {
-    reearth.camera.lookAt(position);
+    reearth.camera.lookAt(position, { animation: false });
 }
 
 let isBoxClicked = false;
 let isTopBottomSidePlaneClicked = false;
 let currentCameraPosition = null;
-let currentPosition = position || {};
+let currentLocation = location || {};
 let prevY = null;
 reearth.on("mousedown", (e) => {
      if(e.layerId?.startsWith(boxId)) {
@@ -108,12 +113,16 @@ reearth.on("mousedown", (e) => {
         isTopBottomSidePlaneClicked = e.layerId.endsWith("top") || e.layerId.endsWith("bottom");
      }
     if(isBoxClicked) {
+        const cameraPosition = reearth.camera.position;
+        currentCameraPosition = { ...cameraPosition };
         lookAt(currentCameraPosition);
     }
 });
 reearth.on("mouseup", () => {
     if(isBoxClicked) {
-        lookAt(currentCameraPosition);
+        // TODO: Fix to use `animation: false`.
+        // This is workaround because if we use `lookAt` with `animation: false`, zooming interaction is freeze.
+        reearth.camera.lookAt(currentCameraPosition, { duration: 0 });
         currentCameraPosition = null;
         isBoxClicked = false;
         isTopBottomSidePlaneClicked = false;
@@ -127,36 +136,38 @@ reearth.on("mousemove", (e) => {
     }
 
     if(isTopBottomSidePlaneClicked) {
-        const scale = reearth.camera.position.height / currentPosition.height;
-        currentPosition.height = Math.max(currentPosition.height + (prevY - e.y) * scale, 1);
+        const scale = reearth.camera.position.height / currentLocation.height;
+        currentLocation.height = Math.max(currentLocation.height + (prevY - e.y) * scale, 1);
         prevY = e.y;
     } else {
-        currentPosition.lat = e.lat;
-        currentPosition.lng = e.lng;
+        currentLocation.lat = e.lat;
+        currentLocation.lng = e.lng;
     }
 
     lookAt(currentCameraPosition);
 
     reearth.layers.overrideProperty(boxId, {
         default: {
-            dimensions,
-        position: {
-                lng: currentPosition.lng,
-                lat: currentPosition.lat,
+            ...dimensions,
+            location: {
+                lng: currentLocation.lng,
+                lat: currentLocation.lat,
+                height: currentLocation.height,
             },
-            height: currentPosition.height,
         },
     });
 
     new Promise((resolve) => {
         reearth.layers.overrideProperty(tilesetId, {
             default: {
-                clippingPlaneCollection: {
+                experimental_clipping: {
                     planes: SIDE_PLANES,
-                    dimensions,
-                    lng: currentPosition.lng,
-                    lat: currentPosition.lat,
-                    height: currentPosition.height,
+                    ...dimensions,
+                    location: {
+                        lng: currentLocation.lng,
+                        lat: currentLocation.lat,
+                        height: currentLocation.height,
+                    },
                 },
             }
         });
