@@ -56,23 +56,23 @@ const clipping = userInput.clipping || {};
 const box = userInput.box || {};
 const tileset = userInput.tileset?.url;
 
+const boxProperties = {
+    location: {
+        lng: location.lng,
+        lat: location.lat,
+        height: location.height,
+    },
+    ...dimensions,
+    ...box,
+}
+
 const boxId = reearth.layers.add({
   extensionId: "box",
   pluginId: "reearth",
   isVisible: true,
   property: {
     default: {
-      location: {
-          lng: location.lng,
-          lat: location.lat,
-          height: location.height,
-      },
-      ...dimensions,
-      outlineColor: box.outlineColor,
-      outlineWidth: box.outlineWidth,
-      fill: !!box.fillColor,
-      fillColor: box.fillColor,
-      outline: !!box.outlineColor,
+      ...boxProperties,
     },
   },
 });
@@ -83,12 +83,7 @@ const tilesetId = reearth.layers.add({
   property: {
     default: {
       experimental_clipping: {
-        location: {
-            lng: location.lng,
-            lat: location.lat,
-            height: location.height,
-        },
-        ...dimensions,
+        ...boxProperties,
         planes: SIDE_PLANES,
       },
       edgeColor: clipping.edgeColor,
@@ -105,20 +100,94 @@ const lookAt = (position) => {
 let isBoxClicked = false;
 let isTopBottomSidePlaneClicked = false;
 let currentCameraPosition = null;
-let currentLocation = location || {};
 let prevY = null;
+
+const boxState = {
+    activeBox: false,
+    activeScalePointIndex: undefined, // 0 ~ 11
+    isScalePointClicked: false,
+    activeEdgeIndex: undefined, // 0 ~ 4
+    isEdgeClicked: false,
+    cursor: "default" // grab | grabbing | default
+};
+
+const updateBox = (shouldUpdateClipping) => {
+    reearth.layers.overrideProperty(boxId, {
+        default: {
+            ...boxProperties,
+            location: { ...boxProperties.location },
+            cursor: boxState.cursor,
+            activeBox: boxState.activeBox,
+            activeScalePointIndex: boxState.activeScalePointIndex,
+            activeEdgeIndex: boxState.activeEdgeIndex,
+        },
+    });
+
+    if(shouldUpdateClipping) {
+        new Promise((resolve) => {
+            reearth.layers.overrideProperty(tilesetId, {
+                default: {
+                    experimental_clipping: {
+                        planes: SIDE_PLANES,
+                        ...boxProperties,
+                        keepAboveGround: boxProperties.keepBoxAboveGround,
+                        location: { ...boxProperties.location },
+                    },
+                }
+            });
+            resolve();
+        });
+    }
+}
+
 reearth.on("mousedown", (e) => {
-     if(e.layerId?.startsWith(boxId)) {
+    // Handle scale box
+    if(e.layerId?.startsWith(`${boxId}-scale-point`)) {
+        boxState.cursor = "nesw-resize";
+        const index = Number(e.layerId.split("-").slice(-1)[0]);
+        boxState.activeScalePointIndex = index;
+        boxState.isScalePointClicked = true;
+        updateBox();
+    }
+    // Handle edge
+    if(e.layerId?.startsWith(`${boxId}-edge-draggable`)) {
+        boxState.cursor = "grabbing";
+        const index = Number(e.layerId.split("-").slice(-1)[0]);
+        boxState.activeEdgeIndex = index;
+        boxState.isEdgeClicked = true;
+        updateBox();
+    }
+
+    if(e.layerId?.startsWith(`${boxId}-plane`)) {
         isBoxClicked = true;
         isTopBottomSidePlaneClicked = e.layerId.endsWith("top") || e.layerId.endsWith("bottom");
-     }
+    }
     if(isBoxClicked) {
         const cameraPosition = reearth.camera.position;
         currentCameraPosition = { ...cameraPosition };
         lookAt(currentCameraPosition);
+        
+        if(!boxState.isScalePointClicked || !boxState.isEdgeClicked) {
+            boxState.cursor = "grabbing";
+            boxState.activeBox = true;
+            updateBox();
+        }
     }
 });
-reearth.on("mouseup", () => {
+reearth.on("mouseup", (e) => {
+    if(boxState.activeScalePointIndex || boxState.activeEdgeIndex) {
+        boxState.cursor = "default";
+
+        // Handle scale box
+        boxState.activeScalePointIndex = undefined;
+        boxState.isScalePointClicked = false;
+        // Handle edge
+        boxState.activeEdgeIndex = undefined;
+        boxState.isEdgeClicked = false;
+        
+        updateBox();
+    }
+
     if(isBoxClicked) {
         // TODO: Fix to use `animation: false`.
         // This is workaround because if we use `lookAt` with `animation: false`, zooming interaction is freeze.
@@ -127,6 +196,10 @@ reearth.on("mouseup", () => {
         isBoxClicked = false;
         isTopBottomSidePlaneClicked = false;
         prevY = null;
+        
+        boxState.activeBox = false;
+        boxState.cursor = "default";
+        updateBox();
     }
 });
 reearth.on("mousemove", (e) => {
@@ -136,41 +209,98 @@ reearth.on("mousemove", (e) => {
     }
 
     if(isTopBottomSidePlaneClicked) {
-        const scale = reearth.camera.position.height / currentLocation.height;
-        currentLocation.height = Math.max(currentLocation.height + (prevY - e.y) * scale, 1);
+        const scale = (() => {
+            if(!boxProperties.keepBoxAboveGround) {
+                return reearth.camera.position.height / boxProperties.location.height;
+            }
+            return Math.floor(boxProperties.location.height) > 5 ? reearth.camera.position.height / boxProperties.location.height : 1;
+        })();
+        boxProperties.location.height = Math.max(boxProperties.location.height + (prevY - e.y) * scale, 1);
         prevY = e.y;
     } else {
-        currentLocation.lat = e.lat;
-        currentLocation.lng = e.lng;
+        boxProperties.location.lat = e.lat;
+        boxProperties.location.lng = e.lng;
     }
 
     lookAt(currentCameraPosition);
 
-    reearth.layers.overrideProperty(boxId, {
-        default: {
-            ...dimensions,
-            location: {
-                lng: currentLocation.lng,
-                lat: currentLocation.lat,
-                height: currentLocation.height,
-            },
-        },
-    });
+    updateBox(true);
+});
+reearth.on("mouseenter", (e) => {
+    const enableEnterHandling = !boxState.isScalePointClicked && !boxState.isEdgeClicked && !isBoxClicked;
+    // Handle scale box
+    if(e.layerId?.startsWith(`${boxId}-scale-point`)) {
+        if(enableEnterHandling) {
+            boxState.cursor = "nesw-resize";
+            const index = Number(e.layerId.split("-").slice(-1)[0]);
+            boxState.activeScalePointIndex = index;
+            updateBox();
+        }
+    }
+    // Handle edge
+    if(e.layerId?.startsWith(`${boxId}-edge-draggable`)) {
+        if(enableEnterHandling) {
+            boxState.cursor = "grab";
+            const index = Number(e.layerId.split("-").slice(-1)[0]);
+            boxState.activeEdgeIndex = index;
+            updateBox();
+        }
+    }
 
-    new Promise((resolve) => {
-        reearth.layers.overrideProperty(tilesetId, {
-            default: {
-                experimental_clipping: {
-                    planes: SIDE_PLANES,
-                    ...dimensions,
-                    location: {
-                        lng: currentLocation.lng,
-                        lat: currentLocation.lat,
-                        height: currentLocation.height,
-                    },
-                },
-            }
-        });
-        resolve();
-    });
+    if(e.layerId?.startsWith(`${boxId}-plane`)) {
+        if(enableEnterHandling) {
+            boxState.cursor = "grab";
+            boxState.activeBox = true;
+            updateBox();
+        }
+    }
+});
+reearth.on("mouseleave", (e) => {
+    const enableLeaveHandling = !boxState.isScalePointClicked && !boxState.isEdgeClicked && !isBoxClicked;
+    // Handle scale box
+    if(e.layerId?.startsWith(`${boxId}-scale-point`)) {
+        if(enableLeaveHandling) {
+            boxState.cursor = "default";
+            boxState.activeScalePointIndex = undefined;
+            updateBox();
+        }
+    }
+    // Handle edge
+    if(e.layerId?.startsWith(`${boxId}-edge-draggable`)) {
+        if(enableLeaveHandling) {
+            boxState.cursor = "default";
+            boxState.activeEdgeIndex = undefined;
+            updateBox();
+        }
+    }
+
+    if(e.layerId?.startsWith(`${boxId}-plane`)) {
+        if(enableLeaveHandling) {
+            boxState.cursor = "default";
+            boxState.activeBox = false;
+            updateBox();
+        }
+    }
+});
+
+reearth.on("boxscale", (e) => {
+    lookAt(currentCameraPosition);
+
+    boxProperties.width = e.width;
+    boxProperties.height = e.height;
+    boxProperties.length = e.length;
+    boxProperties.location.lng = e.location.lng;
+    boxProperties.location.lat = e.location.lat;
+    boxProperties.location.height = e.location.height;
+
+    updateBox(true);
+});
+reearth.on("boxrotate", (e) => {
+    lookAt(currentCameraPosition);
+
+    boxProperties.heading = e.heading;
+    boxProperties.pitch = e.pitch;
+    boxProperties.roll = e.roll;
+
+    updateBox(true);
 });

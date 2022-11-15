@@ -43,12 +43,45 @@ extensions:
             - id: outlineColor
               type: string
               title: outline color
-            - id: outlineWidth
+            - id: activeOutlineColor
               type: string
+              title: active outline color
+            - id: outlineWidth
+              type: number
               title: outline width
+            - id: draggableOutlineWidth
+              type: number
+              title: draggable outline width
+            - id: draggableOutlineColor
+              type: string
+              title: draggable outline color
+            - id: activeDraggableOutlineColor
+              type: string
+              title: active draggable outline color
             - id: fillColor
               type: string
               title: side plane color
+            - id: axisLineColor
+              type: string
+              title: axis line color
+            - id: axisLineWidth
+              type: number
+              title: axis line width
+            - id: pointFillColor
+              type: string
+              title: scale point fill color
+            - id: pointOutlineColor
+              type: string
+              title: scale point outline color
+            - id: activePointOutlineColor
+              type: string
+              title: active scale point outline color
+            - id: pointOutlineWidth
+              type: string
+              title: scale point outline width
+            - id: keepBoxAboveGround
+              type: bool
+              title: keep box above ground
         - id: clipping
           title: Clipping
           fields:
