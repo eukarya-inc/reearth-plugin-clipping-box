@@ -97,6 +97,8 @@ const lookAt = (position) => {
     reearth.camera.lookAt(position, { animation: false });
 }
 
+const allowEnterGround = () => !!reearth.scene.property.default.allowEnterGround;
+
 let isBoxClicked = false;
 let isTopBottomSidePlaneClicked = false;
 let currentCameraPosition = null;
@@ -130,7 +132,6 @@ const updateBox = (shouldUpdateClipping) => {
                     experimental_clipping: {
                         planes: SIDE_PLANES,
                         ...boxProperties,
-                        keepAboveGround: boxProperties.keepBoxAboveGround,
                         location: { ...boxProperties.location },
                     },
                 }
@@ -210,7 +211,7 @@ reearth.on("mousemove", (e) => {
 
     if(isTopBottomSidePlaneClicked) {
         const scale = (() => {
-            if(!boxProperties.keepBoxAboveGround) {
+            if(!allowEnterGround()) {
                 return reearth.camera.position.height / boxProperties.location.height;
             }
             return Math.floor(boxProperties.location.height) > 5 ? reearth.camera.position.height / boxProperties.location.height : 1;
