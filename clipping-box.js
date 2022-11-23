@@ -284,24 +284,31 @@ reearth.on("mouseleave", (e) => {
     }
 });
 
-reearth.on("boxscale", (e) => {
-    lookAt(currentCameraPosition);
+reearth.on("layeredit", (e) => {
+    if(e.layerId?.startsWith(`${boxId}-scale-point`) && e.scale) {
+        lookAt(currentCameraPosition);
+    
+        const scale = e.scale;
 
-    boxProperties.width = e.width;
-    boxProperties.height = e.height;
-    boxProperties.length = e.length;
-    boxProperties.location.lng = e.location.lng;
-    boxProperties.location.lat = e.location.lat;
-    boxProperties.location.height = e.location.height;
+        boxProperties.width = scale.width;
+        boxProperties.height = scale.height;
+        boxProperties.length = scale.length;
+        boxProperties.location.lng = scale.location.lng;
+        boxProperties.location.lat = scale.location.lat;
+        boxProperties.location.height = scale.location.height;
+    
+        updateBox(true);
+    }
 
-    updateBox(true);
-});
-reearth.on("boxrotate", (e) => {
-    lookAt(currentCameraPosition);
+    if(e.layerId?.startsWith(`${boxId}-edge-draggable`) && e.rotation) {
+        lookAt(currentCameraPosition);
 
-    boxProperties.heading = e.heading;
-    boxProperties.pitch = e.pitch;
-    boxProperties.roll = e.roll;
+        const rotation = e.rotation;
 
-    updateBox(true);
+        boxProperties.heading = rotation.heading;
+        boxProperties.pitch = rotation.pitch;
+        boxProperties.roll = rotation.roll;
+
+        updateBox(true);
+    }
 });
